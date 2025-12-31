@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Favorites</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h2>🍳 Recipe System</h2>
+            <div class="nav-menu">
+                <a href="dashboard.html">Home</a>
+                <a href="favorites.html" class="active">Favorites</a>
+                <a href="profile.html">Profile</a>
+                <a href="#" onclick="logout()">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <h1>My Favorite Recipes</h1>
+        <div class="recipe-grid" id="favoritesGrid"></div>
+    </div>
+    
+    <script>
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) window.location.href = 'login.html';
+        
+        window.addEventListener('load', loadFavorites);
+        
+        async function loadFavorites() {
+            try {
+                const response = await fetch(`http://localhost:8080/api/favorites/${user.id}`);
+                const result = await response.json();
+                
+                const grid = document.getElementById('favoritesGrid');
+                
+                if (result.data.length === 0) {
+                    grid.innerHTML = '<p>No favorites yet. Start adding some recipes!</p>';
+                    return;
+                }
+                
+                grid.innerHTML = '';
+                result.data.forEach(fav => {
+                    const card = document.createElement('div');
+                    card.className = 'recipe-card';
+                    card.innerHTML = `
+                        <img src="${fav.recipeImage}" alt="${fav.recipeTitle}">
+                        <div class="recipe-info">
+                            <h3>${fav.recipeTitle}</h3>
+                            <button onclick="viewRecipe(${fav.recipeId})" class="btn-small">View Recipe</button>
+                            <button onclick="removeFavorite(${fav.recipeId})" class="btn-small btn-danger">Remove</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function viewRecipe(recipeId) {
+            window.location.href = `recipe-detail.html?id=${recipeId}`;
+        }
+        
+        async function removeFavorite(recipeId) {
+            if (!confirm('Remove from favorites?')) return;
+            
+            try {
+                await fetch(
+                    `http://localhost:8080/api/favorites/remove?userId=${user.id}&recipeId=${recipeId}`,
+                    {method: 'DELETE'}
+                );
+                loadFavorites();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

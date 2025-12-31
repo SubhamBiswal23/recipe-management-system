@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Details</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h2>🍳 Recipe System</h2>
+            <div class="nav-menu">
+                <a href="dashboard.html">Home</a>
+                <a href="favorites.html">Favorites</a>
+                <a href="profile.html">Profile</a>
+                <a href="#" onclick="logout()">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div id="recipeDetail"></div>
+        
+        <div class="rating-section">
+            <h2>Rate This Recipe</h2>
+            <div class="stars" id="stars">
+                <span onclick="rate(1)">⭐</span>
+                <span onclick="rate(2)">⭐</span>
+                <span onclick="rate(3)">⭐</span>
+                <span onclick="rate(4)">⭐</span>
+                <span onclick="rate(5)">⭐</span>
+            </div>
+            <textarea id="reviewText" placeholder="Write your review (optional)" rows="4"></textarea>
+            <button onclick="submitRating()" class="btn">Submit Rating</button>
+        </div>
+        
+        <div class="reviews-section">
+            <h2>Reviews</h2>
+            <div id="reviewsList"></div>
+        </div>
+    </div>
+    
+    <script>
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) window.location.href = 'login.html';
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const recipeId = urlParams.get('id');
+        let selectedRating = 0;
+        let recipeData = null;
+        
+        window.addEventListener('load', async function() {
+            await loadRecipeDetails();
+            await loadRatings();
+        });
+        
+        async function loadRecipeDetails() {
+            try {
+                const response = await fetch(`http://localhost:8080/api/recipes/${recipeId}`);
+                recipeData = await response.json();
+                
+                document.getElementById('recipeDetail').innerHTML = `
+                    <div class="recipe-detail">
+                        <img src="${recipeData.image}" alt="${recipeData.title}">
+                        <h1>${recipeData.title}</h1>
+                        <p>⏱️ ${recipeData.readyInMinutes} minutes | 🍽️ ${recipeData.servings} servings</p>
+                        <button onclick="toggleFavorite()" class="btn" id="favoriteBtn">Add to Favorites</button>
+                        
+                        <h2>Ingredients</h2>
+                        <ul>
+                            ${recipeData.extendedIngredients.map(ing => 
+                                `<li>${ing.original}</li>`
+                            ).join('')}
+                        </ul>
+                        
+                        <h2>Instructions</h2>
+                        <div>${recipeData.instructions || 'No instructions available'}</div>
+                    </div>
+                `;
+                
+                checkIfFavorite();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        async function checkIfFavorite() {
+            try {
+                const response = await fetch(
+                    `http://localhost:8080/api/favorites/check?userId=${user.id}&recipeId=${recipeId}`
+                );
+                const result = await response.json();
+                if (result.data) {
+                    document.getElementById('favoriteBtn').textContent = 'Remove from Favorites';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        async function toggleFavorite() {
+            const btn = document.getElementById('favoriteBtn');
+            const isCurrentlyFavorite = btn.textContent === 'Remove from Favorites';
+            
+            try {
+                if (isCurrentlyFavorite) {
+                    await fetch(
+                        `http://localhost:8080/api/favorites/remove?userId=${user.id}&recipeId=${recipeId}`,
+                        {method: 'DELETE'}
+                    );
+                    btn.textContent = 'Add to Favorites';
+                    alert('Removed from favorites');
+                } else {
+                    await fetch(
+                        `http://localhost:8080/api/favorites/add?userId=${user.id}&recipeId=${recipeId}&recipeTitle=${encodeURIComponent(recipeData.title)}&recipeImage=${encodeURIComponent(recipeData.image)}`,
+                        {method: 'POST'}
+                    );
+                    btn.textContent = 'Remove from Favorites';
+                    alert('Added to favorites');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function rate(stars) {
+            selectedRating = stars;
+            const starElements = document.querySelectorAll('#stars span');
+            starElements.forEach((star, index) => {
+                star.style.color = index < stars ? 'gold' : 'gray';
+            });
+        }
+        
+        async function submitRating() {
+            if (selectedRating === 0) {
+                alert('Please select a rating');
+                return;
+            }
+            
+            const review = document.getElementById('reviewText').value;
+            
+            try {
+                const response = await fetch(
+                    `http://localhost:8080/api/ratings/add?userId=${user.id}&recipeId=${recipeId}&rating=${selectedRating}&review=${encodeURIComponent(review)}`,
+                    {method: 'POST'}
+                );
+                const result = await response.json();
+                alert(result.message);
+                loadRatings();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        async function loadRatings() {
+            try {
+                const response = await fetch(`http://localhost:8080/api/ratings/${recipeId}`);
+                const result = await response.json();
+                
+                const reviewsList = document.getElementById('reviewsList');
+                if (result.data.ratings.length === 0) {
+                    reviewsList.innerHTML = '<p>No reviews yet</p>';
+                } else {
+                    reviewsList.innerHTML = `
+                        <p><strong>Average Rating:</strong> ${result.data.averageRating} ⭐ (${result.data.totalRatings} reviews)</p>
+                        ${result.data.ratings.map(r => `
+                            <div class="review">
+                                <strong>${'⭐'.repeat(r.rating)}</strong>
+                                <p>${r.review || 'No review text'}</p>
+                            </div>
+                        `).join('')}
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

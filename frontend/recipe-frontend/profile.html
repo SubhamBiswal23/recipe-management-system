@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h2>🍳 Recipe System</h2>
+            <div class="nav-menu">
+                <a href="dashboard.html">Home</a>
+                <a href="favorites.html">Favorites</a>
+                <a href="profile.html" class="active">Profile</a>
+                <a href="#" onclick="logout()">Logout</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="profile-box">
+            <h1>My Profile</h1>
+            <div id="profileContent"></div>
+        </div>
+    </div>
+    
+    <script>
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) window.location.href = 'login.html';
+        
+        window.addEventListener('load', loadProfile);
+        
+        async function loadProfile() {
+            try {
+                const response = await fetch(`http://localhost:8080/api/users/profile/${user.id}`);
+                const result = await response.json();
+                
+                const profile = result.data;
+                
+                document.getElementById('profileContent').innerHTML = `
+                    <div class="profile-info">
+                        <p><strong>Username:</strong> ${profile.username}</p>
+                        <p><strong>Email:</strong> ${profile.email}</p>
+                        <p><strong>Skill Level:</strong> ${profile.skillLevel}</p>
+                        <p><strong>Member Since:</strong> ${new Date(profile.createdAt).toLocaleDateString()}</p>
+                        
+                        <h3>Dietary Preferences</h3>
+                        <div class="tags">
+                            ${profile.dietPreferences.map(diet => 
+                                `<span class="tag">${diet}</span>`
+                            ).join('') || '<p>None</p>'}
+                        </div>
+                        
+                        <h3>Allergies</h3>
+                        <div class="tags">
+                            ${profile.allergies.map(allergy => 
+                                `<span class="tag tag-danger">${allergy}</span>`
+                            ).join('') || '<p>None</p>'}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
